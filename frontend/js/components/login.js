@@ -253,14 +253,25 @@ const LoginPage = {
             btn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div> 正在启动...';
         }
 
+        // 检测是否在 Docker 环境（有 noVNC 远程桌面）
+        let novncUrl = '';
+        try {
+            const novncData = await API.novnc.url();
+            if (novncData && novncData.enabled) {
+                novncUrl = novncData.novnc_url;
+            }
+        } catch (e) { /* 非 Docker 环境，忽略 */ }
+
         // 显示扫码状态区域
         const statusEl = document.getElementById('pool-login-status');
         if (statusEl) {
+            const novncHint = API.novnc.iframe(novncUrl);
             statusEl.innerHTML = `
                 <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center;">
                     <div class="spinner" style="margin: 0 auto 12px;"></div>
                     <p style="color: var(--text-primary); font-weight: 600;">正在启动浏览器扫码登录...</p>
                     <p style="color: var(--text-muted); font-size: 0.85rem;">请在弹出的浏览器窗口中扫码</p>
+                    ${novncHint}
                     <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="LoginPage.cancelLogin()">取消</button>
                 </div>
             `;
@@ -288,16 +299,23 @@ const LoginPage = {
                 if (!statusEl) return;
 
                 if (loginState.status === 'scanning') {
-                    statusEl.innerHTML = `
-                        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center;">
-                            <div class="spinner" style="margin: 0 auto 12px;"></div>
-                            <p style="color: var(--text-primary); font-weight: 600;">${loginState.message}</p>
-                            <div class="progress-bar" style="width: 60%; margin: 12px auto;">
-                                <div class="progress-fill" style="width: ${loginState.progress}%"></div>
+                    // Docker 环境：保留 noVNC iframe，只更新文本消息
+                    const novncIframe = statusEl.querySelector('iframe');
+                    if (novncIframe) {
+                        const msgEl = statusEl.querySelector('.scan-msg');
+                        if (msgEl) msgEl.textContent = loginState.message;
+                    } else {
+                        statusEl.innerHTML = `
+                            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center;">
+                                <div class="spinner" style="margin: 0 auto 12px;"></div>
+                                <p class="scan-msg" style="color: var(--text-primary); font-weight: 600;">${loginState.message}</p>
+                                <div class="progress-bar" style="width: 60%; margin: 12px auto;">
+                                    <div class="progress-fill" style="width: ${loginState.progress}%"></div>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="LoginPage.cancelLogin()">取消登录</button>
                             </div>
-                            <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="LoginPage.cancelLogin()">取消登录</button>
-                        </div>
-                    `;
+                        `;
+                    }
                 } else if (loginState.status === 'success') {
                     statusEl.innerHTML = `
                         <div style="background: rgba(7,193,96,0.05); border: 1px solid rgba(7,193,96,0.2); border-radius: 12px; padding: 20px; text-align: center;">

@@ -31,6 +31,7 @@ from backend.account_pool_api import account_pool_bp
 from backend.douyin import douyin_bp
 from backend.douyin_login import douyin_login_bp
 from backend.douyin_auth import douyin_auth_bp
+from backend.douyin_subscription import subscription_bp
 from backend.kuaishou import kuaishou_bp
 from backend.kuaishou_auth import kuaishou_auth_bp
 from backend.channels import channels_bp
@@ -58,6 +59,7 @@ app.register_blueprint(account_pool_bp)
 app.register_blueprint(douyin_bp)
 app.register_blueprint(douyin_login_bp)
 app.register_blueprint(douyin_auth_bp)
+app.register_blueprint(subscription_bp)
 app.register_blueprint(kuaishou_bp)
 app.register_blueprint(kuaishou_auth_bp)
 app.register_blueprint(channels_bp)
@@ -115,6 +117,22 @@ def save_settings():
     return jsonify({"message": "设置已保存"})
 
 
+# ── noVNC 远程桌面 URL（Docker 环境下扫码登录用）──────────────
+@app.route("/api/novnc-url", methods=["GET"])
+def get_novnc_url():
+    from flask import jsonify, request
+    novnc_port = os.environ.get("NOVNC_PORT", "")
+    if not novnc_port:
+        return jsonify({"novnc_url": "", "enabled": False})
+    # 根据当前请求的 Host 推导 noVNC 访问地址
+    host = request.host.split(":")[0]
+    # noVNC 使用 hash fragment（#）传递参数
+    # autoconnect=1 自动连接，resize=scale 缩放适配，reconnect=1 断线重连
+    # path=websockify 指定 WebSocket 路径
+    novnc_url = f"http://{host}:{novnc_port}/vnc.html#autoconnect=1&resize=scale&reconnect=1&path=websockify"
+    return jsonify({"novnc_url": novnc_url, "enabled": True})
+
+
 # ── 启动 ──────────────────────────────────────────────────
 
 def open_browser(port: int):
@@ -126,13 +144,16 @@ def open_browser(port: int):
 
 def main():
     parser = argparse.ArgumentParser(description="微信公众号文章下载管理工具")
-    parser.add_argument("--port", type=int, default=5200, help="服务端口 (默认 5200)")
-    parser.add_argument("--host", type=str, default="127.0.0.1", help="监听地址")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 5200)), help="服务端口 (默认 5200)")
+    parser.add_argument("--host", type=str, default=os.environ.get("HOST", "127.0.0.1"), help="监听地址")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     parser.add_argument("--debug", action="store_true", help="调试模式")
     args = parser.parse_args()
 
     ensure_dirs()
+
+    # 环境变量 NO_BROWSER=1 时强制不打开浏览器（Docker 等无 GUI 场景）
+    no_browser = args.no_browser or os.environ.get("NO_BROWSER", "").lower() in ("1", "true", "yes")
 
     print()
     print("=" * 56)
@@ -141,7 +162,7 @@ def main():
     print("=" * 56)
     print()
 
-    if not args.no_browser:
+    if not no_browser:
         threading.Thread(target=open_browser, args=(args.port,), daemon=True).start()
 
     try:

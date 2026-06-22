@@ -14,4 +14,5 @@ pyobjc-framework-WebKit>=10.0; sys_platform == "darwin"
 xhshow>=0.2.0
 pyyaml>=6.0
 httpx
+openpyxl>=3.1
 

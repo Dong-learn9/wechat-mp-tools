@@ -3,6 +3,7 @@ const DyCollectionsPage = {
     cursor: 0,
     loading: false,
     hasMore: true,
+    subscribedSecUids: new Set(),
 
     render() {
         return `
@@ -61,12 +62,21 @@ const DyCollectionsPage = {
         this.showLoading();
 
         try {
-            const res = await fetch(`/api/douyin/collected?count=18&cursor=${this.cursor}`);
-            const data = await res.json();
+            // 并行获取视频列表和已订阅列表
+            const [collectedRes, subRes] = await Promise.all([
+                fetch(`/api/douyin/collected?count=18&cursor=${this.cursor}`),
+                API.douyinSubscription.list().catch(() => ({ subscriptions: [] })),
+            ]);
+            const data = await collectedRes.json();
 
             if (data.error) {
                 throw new Error(data.error);
             }
+
+            // 缓存已订阅的 sec_uid
+            this.subscribedSecUids = new Set(
+                (subRes.subscriptions || []).map(s => s.sec_uid)
+            );
 
             const videos = data.aweme_list || [];
             this.videos = videos;
@@ -153,6 +163,13 @@ const DyCollectionsPage = {
         const likes = this.formatNumber(video.statistics?.digg_count || 0);
         const comments = this.formatNumber(video.statistics?.comment_count || 0);
         const awemeId = video.aweme_id;
+        const secUid = video.author?.sec_uid || '';
+        const isSubscribed = secUid && this.subscribedSecUids.has(secUid);
+        const subBtnClass = isSubscribed ? 'btn-success' : 'btn-secondary';
+        const subBtnText = isSubscribed ? '已订阅' : '订阅';
+        const subBtnAction = isSubscribed
+            ? `Router.navigate('dy_subscriptions')`
+            : `DyCollectionsPage.subscribeAuthor('${secUid}', this)`;
 
         return `
             <div class="video-card" style="border-radius: 12px; overflow: hidden; background: var(--bg-secondary); transition: transform 0.3s, box-shadow 0.3s; cursor: pointer;" onmouseenter="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.15)';" onmouseleave="this.style.transform=''; this.style.boxShadow='';" onclick="if(event.target.tagName !== 'BUTTON') window.open('https://www.douyin.com/video/${awemeId}', '_blank')">
@@ -165,8 +182,9 @@ const DyCollectionsPage = {
                 <div style="padding: var(--spacing-md);">
                     <h3 style="font-size: 0.95rem; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; color: #ffffff;">${title}</h3>
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                        <img src="${avatar}" alt="${author}" style="width: 24px; height: 24px; border-radius: 50%;" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22%3E%3Ccircle fill=%22%23ddd%22 cx=%2212%22 cy=%2212%22 r=%2212%22/%3E%3C/svg%3E'">
-                        <span style="font-size: 0.85rem; color: var(--text-muted);">${author}</span>
+                        <img src="${avatar}" alt="${author}" style="width: 24px; height: 24px; border-radius: 50%; cursor: ${secUid ? 'pointer' : 'default'};" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22%3E%3Ccircle fill=%22%23ddd%22 cx=%2212%22 cy=%2212%22 r=%2212%22/%3E%3C/svg%3E'" ${secUid ? `onclick="event.stopPropagation(); window.open('https://www.douyin.com/user/${secUid}', '_blank')"` : ''}>
+                        <span style="font-size: 0.85rem; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: ${secUid ? 'pointer' : 'default'};" ${secUid ? `onclick="event.stopPropagation(); Router.navigate('dy_user', { sec_uid: '${secUid}' })"` : ''}>${author}</span>
+                        ${secUid ? `<button class="btn ${subBtnClass} btn-sm" style="font-size: 0.75rem; padding: 2px 8px;" onclick="event.stopPropagation(); ${subBtnAction}">${subBtnText}</button>` : ''}
                     </div>
                     <div style="display: flex; gap: var(--spacing-md); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
                         <span>❤️ ${likes}</span>
@@ -176,6 +194,25 @@ const DyCollectionsPage = {
                 </div>
             </div>
         `;
+    },
+
+    async subscribeAuthor(secUid, btn) {
+        if (!secUid) return;
+        if (btn) { btn.disabled = true; btn.textContent = '订阅中...'; }
+        try {
+            const url = `https://www.douyin.com/user/${secUid}`;
+            const data = await API.douyinSubscription.add(url);
+            Toast.show(data.message, 'success');
+            this.subscribedSecUids.add(secUid);
+            if (btn) {
+                btn.textContent = '已订阅';
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-success');
+                btn.onclick = () => Router.navigate('dy_subscriptions');
+            }
+        } catch (err) {
+            if (btn) { btn.textContent = '订阅'; btn.disabled = false; }
+        }
     },
 
     async downloadVideo(awemeId) {

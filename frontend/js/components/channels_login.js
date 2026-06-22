@@ -43,6 +43,9 @@ const ChannelsLoginPage = {
                         <div class="form-hint" style="margin-top: -8px; line-height: 1.4;">
                             * 提示：如果启动失败，请确保电脑上已安装 Google Chrome 浏览器。
                         </div>
+
+                        <!-- noVNC 远程桌面容器（Docker 环境下扫码登录用） -->
+                        <div id="yb-novnc-container"></div>
                     </div>
                 </div>
 
@@ -201,6 +204,19 @@ const ChannelsLoginPage = {
                 badge.style.color = '#3182ce';
                 badge.style.background = 'rgba(49, 130, 206, 0.1)';
             }
+
+            // 检测是否在 Docker 环境（有 noVNC 远程桌面），在页面中嵌入 iframe
+            try {
+                const novncData = await API.novnc.url();
+                if (novncData && novncData.enabled) {
+                    const novncContainer = document.getElementById('yb-novnc-container');
+                    if (novncContainer) {
+                        novncContainer.innerHTML = API.novnc.iframe(novncData.novnc_url);
+                    } else {
+                        Toast.info('Docker 环境检测到，请在下方桌面中扫码登录', 5000);
+                    }
+                }
+            } catch (e) { /* 非 Docker 环境，忽略 */ }
 
             if (this.cookiePollTimer) clearInterval(this.cookiePollTimer);
 

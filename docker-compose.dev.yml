@@ -1,0 +1,43 @@
+# docker-compose.dev.yml — 开发模式
+# 项目文件变更实时同步到容器，Flask debug 模式自动热重载
+#
+# 用法:
+#   docker compose -f docker-compose.dev.yml up          前台启动（可看日志）
+#   docker compose -f docker-compose.dev.yml up -d        后台启动
+#   docker compose -f docker-compose.dev.yml down        停止
+#
+# 修改本机项目代码后，容器内 Flask 会自动检测变更并重启，无需重建镜像。
+# 访问: http://localhost:5200
+
+services:
+  wechat-mp-tools-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wechat-mp-tools:dev
+    container_name: wechat-mp-tools-dev
+    restart: unless-stopped
+    ports:
+      - "5200:5200"
+      - "6080:6080" # noVNC Web 桌面（扫码登录用）
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5200
+      - NO_BROWSER=1
+      - PYTHONUNBUFFERED=1
+      - FLASK_DEBUG=1
+      - USE_DEBUG=1
+      - NOVNC_PORT=6080
+    # 关键：挂载本机项目目录到容器，实现文件变更实时同步
+    volumes:
+      # 挂载整个项目目录（代码变更实时反映到容器）
+      - .:/app
+      # data 目录使用独立命名卷持久化（避免被本机 data 目录覆盖）
+      - dev_data:/app/data
+    # Playwright 需要共享内存以避免 Chromium 崩溃
+    shm_size: "1gb"
+    # 覆盖入口脚本，启动 VNC + noVNC + Flask debug 热重载模式
+    command: [ "sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & sleep 1 && x11vnc -display :99 -forever -nopw -quiet -bg && NOVNC_WEB=/usr/share/novnc && [ -d $NOVNC_WEB ] || NOVNC_WEB=/usr/share/websockify && websockify --web $NOVNC_WEB 6080 localhost:5900 & exec python app.py --host 0.0.0.0 --port 5200 --no-browser --debug" ]
+
+volumes:
+  dev_data:

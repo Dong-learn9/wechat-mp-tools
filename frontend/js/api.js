@@ -69,12 +69,28 @@ const API = {
         checkCredentials() { return API.get('/api/auth/check-credentials', { showError: false }); },
     },
 
+    // ── noVNC 远程桌面 URL（Docker 环境下扫码登录用）──
+    novnc: {
+        url() { return API.get('/api/novnc-url', { showError: false }); },
+        // 生成嵌入 noVNC 桌面的 iframe HTML（在原网页中扫码登录）
+        iframe(novncUrl, height = 480) {
+            if (!novncUrl) return '';
+            return `
+                <div style="margin-top: 16px; text-align: left;">
+                    <p style="color: var(--warning); font-size: 0.9rem; margin: 0 0 8px 0;">⚠️ 检测到 Docker 环境，浏览器窗口在容器内运行</p>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 8px 0;">下方为容器内浏览器桌面，点击"开始扫码登录"后在此处扫码：</p>
+                    <iframe src="${novncUrl}" style="width: 100%; height: ${height}px; border: 1px solid var(--border-color); border-radius: 8px; background: #000;" allowfullscreen></iframe>
+                </div>
+            `;
+        },
+    },
+
     // ── Account Pool API ─────────────────────────────
     accountPool: {
-        list()         { return API.get('/api/account-pool'); },
-        summary()      { return API.get('/api/account-pool/summary', { showError: false }); },
-        remove(id)     { return API.delete(`/api/account-pool/${id}`); },
-        events()       { return API.get('/api/account-pool/events', { showError: false }); },
+        list() { return API.get('/api/account-pool'); },
+        summary() { return API.get('/api/account-pool/summary', { showError: false }); },
+        remove(id) { return API.delete(`/api/account-pool/${id}`); },
+        events() { return API.get('/api/account-pool/events', { showError: false }); },
     },
 
     // ── Accounts API ─────────────────────────────────
@@ -168,6 +184,30 @@ const API = {
         openParent(path) { return API.post('/api/douyin/open-parent', { path }); },
     },
 
+    // ── Douyin Subscription API ─────────────────────
+    douyinSubscription: {
+        list() { return API.get('/api/douyin/subscription/list'); },
+        add(url) { return API.post('/api/douyin/subscription/add', { url }); },
+        addBatch(text) { return API.post('/api/douyin/subscription/add-batch', { text }); },
+        remove(secUid) { return API.post('/api/douyin/subscription/remove', { sec_uid: secUid }); },
+        clearDownloaded(secUid) { return API.post('/api/douyin/subscription/clear-downloaded', { sec_uid: secUid }); },
+        toggleScan(secUid, enabled) { return API.post('/api/douyin/subscription/toggle-scan', { sec_uid: secUid, enabled }); },
+        refresh() { return API.post('/api/douyin/subscription/refresh'); },
+        download(secUid) { return API.post('/api/douyin/subscription/download', { sec_uid: secUid }); },
+        scanAll() { return API.post('/api/douyin/subscription/scan-all'); },
+        cancel() { return API.post('/api/douyin/subscription/cancel'); },
+        progress() { return API.get('/api/douyin/subscription/progress', { showError: false }); },
+        schedulerStatus() { return API.get('/api/douyin/subscription/scheduler-status'); },
+        schedulerToggle(enabled, intervalMinutes) { return API.post('/api/douyin/subscription/scheduler-toggle', { enabled, interval_minutes: intervalMinutes }); },
+        getConcurrency() { return API.get('/api/douyin/subscription/concurrency'); },
+        setConcurrency(n) { return API.post('/api/douyin/subscription/concurrency', { concurrency: n }); },
+        pause() { return API.post('/api/douyin/subscription/pause'); },
+        resume() { return API.post('/api/douyin/subscription/resume'); },
+        getQueue() { return API.get('/api/douyin/subscription/queue'); },
+        removeFromQueue(sec_uid) { return API.post('/api/douyin/subscription/queue/remove', { sec_uid }); },
+        clearQueue() { return API.post('/api/douyin/subscription/queue/clear'); },
+    },
+
     // ── Kuaishou Downloader API ──────────────────────
     kuaishou: {
         auth: {
@@ -252,35 +292,35 @@ const API = {
     // ── XiaoHongShu API ──────────────────────────────
     xhs: {
         auth: {
-            status()        { return API.get('/api/xhs-auth/status', { showError: false }); },
-            login()         { return API.post('/api/xhs-auth/login'); },
-            saveCookie(c)   { return API.post('/api/xhs-auth/save-cookie', { cookie: c }); },
-            logout()        { return API.post('/api/xhs-auth/logout'); },
+            status() { return API.get('/api/xhs-auth/status', { showError: false }); },
+            login() { return API.post('/api/xhs-auth/login'); },
+            saveCookie(c) { return API.post('/api/xhs-auth/save-cookie', { cookie: c }); },
+            logout() { return API.post('/api/xhs-auth/logout'); },
         },
-        parse(url)                  { return API.post('/api/xhs/parse', { url }); },
-        download(urls)              { return API.post('/api/xhs/download', { urls }); },
-        listAccounts()              { return API.get('/api/xhs/accounts'); },
-        parseUser(url)              { return API.post('/api/xhs/accounts/parse', { url }); },
-        addAccount(user)            { return API.post('/api/xhs/accounts', user); },
-        removeAccount(userId)       { return API.delete(`/api/xhs/accounts/${userId}`); },
-        listNotes(userId)           { return API.get(`/api/xhs/accounts/${userId}/notes`); },
+        parse(url) { return API.post('/api/xhs/parse', { url }); },
+        download(urls) { return API.post('/api/xhs/download', { urls }); },
+        listAccounts() { return API.get('/api/xhs/accounts'); },
+        parseUser(url) { return API.post('/api/xhs/accounts/parse', { url }); },
+        addAccount(user) { return API.post('/api/xhs/accounts', user); },
+        removeAccount(userId) { return API.delete(`/api/xhs/accounts/${userId}`); },
+        listNotes(userId) { return API.get(`/api/xhs/accounts/${userId}/notes`); },
         loadMoreNotes(userId, loaded) { return API.post(`/api/xhs/accounts/${userId}/notes/more`, { loaded }); },
-        downloadNotes(notes, name)  { return API.post('/api/xhs/download-notes', { notes, account_name: name }); },
-        downloadStatus(taskId)      { return API.get(`/api/xhs/download-status/${taskId}`, { showError: false }); },
-        cancelDownload(taskId)      { return API.post(`/api/xhs/download-cancel/${taskId}`); },
-        getHistory(limit = 100)     { return API.get(`/api/xhs/history?limit=${limit}`); },
-        clearHistory()              { return API.delete('/api/xhs/history'); },
-        deleteHistory(index)        { return API.delete(`/api/xhs/history/${index}`); },
-        openFolder(account = '')    { return API.post('/api/xhs/open-folder', { account }); },
-        openFile(path)              { return API.post('/api/xhs/open-file', { path }); },
-        openParent(path)            { return API.post('/api/xhs/open-parent', { path }); },
+        downloadNotes(notes, name) { return API.post('/api/xhs/download-notes', { notes, account_name: name }); },
+        downloadStatus(taskId) { return API.get(`/api/xhs/download-status/${taskId}`, { showError: false }); },
+        cancelDownload(taskId) { return API.post(`/api/xhs/download-cancel/${taskId}`); },
+        getHistory(limit = 100) { return API.get(`/api/xhs/history?limit=${limit}`); },
+        clearHistory() { return API.delete('/api/xhs/history'); },
+        deleteHistory(index) { return API.delete(`/api/xhs/history/${index}`); },
+        openFolder(account = '') { return API.post('/api/xhs/open-folder', { account }); },
+        openFile(path) { return API.post('/api/xhs/open-file', { path }); },
+        openParent(path) { return API.post('/api/xhs/open-parent', { path }); },
     },
 
     // ── Version Update API ──────────────────────────────
     version: {
-        check()         { return API.get('/api/version/check', { showError: false }); },
-        download(url)   { return API.post('/api/version/download', { url }); },
-        progress()      { return API.get('/api/version/download-progress', { showError: false }); },
-        openFolder()    { return API.post('/api/version/open-update-folder'); },
+        check() { return API.get('/api/version/check', { showError: false }); },
+        download(url) { return API.post('/api/version/download', { url }); },
+        progress() { return API.get('/api/version/download-progress', { showError: false }); },
+        openFolder() { return API.post('/api/version/open-update-folder'); },
     }
 };

@@ -35,6 +35,7 @@ const Router = {
             'dy_downloads': typeof DyDownloadsPage !== 'undefined' ? DyDownloadsPage : null,
             'dy_liked': typeof DyLikedPage !== 'undefined' ? DyLikedPage : null,
             'dy_collections': typeof DyCollectionsPage !== 'undefined' ? DyCollectionsPage : null,
+            'dy_subscriptions': typeof DySubscriptionsPage !== 'undefined' ? DySubscriptionsPage : null,
             
             // 快手子系统页面
             'ks_login': typeof KsLoginComponent !== 'undefined' ? KsLoginComponent : null,
@@ -93,7 +94,7 @@ const Router = {
         }
 
         // 抖音未登录页面访问限制拦截（dy_downloads 是本地数据，不需要登录）
-        const requiresDyLogin = ['dy_dashboard', 'dy_search', 'dy_user', 'dy_recommend', 'dy_liked', 'dy_collections'].includes(pageKey);
+        const requiresDyLogin = ['dy_dashboard', 'dy_search', 'dy_user', 'dy_recommend', 'dy_liked', 'dy_collections', 'dy_subscriptions'].includes(pageKey);
         
         if (requiresDyLogin) {
             try {

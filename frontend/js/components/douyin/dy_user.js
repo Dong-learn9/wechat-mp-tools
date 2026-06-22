@@ -25,9 +25,9 @@ const DyUserPage = {
                     <!-- 用户信息卡片 -->
                     <div class="card" style="margin-bottom: var(--spacing-lg);">
                         <div style="display: flex; gap: var(--spacing-lg); align-items: flex-start;">
-                            <img id="dy-user-avatar" src="" alt="用户头像" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border-color);">
+                            <img id="dy-user-avatar" src="" alt="用户头像" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border-color); cursor: pointer;" onclick="DyUserPage.openExternalHomepage()" title="点击打开抖音主页">
                             <div style="flex: 1;">
-                                <h2 id="dy-user-nickname" style="font-size: 1.5rem; margin-bottom: 8px;"></h2>
+                                <h2 id="dy-user-nickname" style="font-size: 1.5rem; margin-bottom: 8px; cursor: pointer;" onclick="DyUserPage.openExternalHomepage()" title="点击打开抖音主页"></h2>
                                 <p id="dy-user-signature" style="color: var(--text-muted); margin-bottom: var(--spacing-md);"></p>
                                 <div style="display: flex; gap: var(--spacing-lg); margin-bottom: var(--spacing-md);">
                                     <div>
@@ -50,6 +50,13 @@ const DyUserPage = {
                                         <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                     批量下载全部作品
+                                </button>
+                                <button class="btn btn-secondary" onclick="DyUserPage.subscribeUser()" id="dy-user-subscribe-btn" style="margin-left: 8px;">
+                                    <svg viewBox="0 0 24 24" fill="none" style="width: 16px; height: 16px; margin-right: 6px;">
+                                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <span id="dy-user-subscribe-text">订阅该用户</span>
                                 </button>
                             </div>
                         </div>
@@ -210,6 +217,37 @@ const DyUserPage = {
                 this.updateDownloadAllButton(data.status);
             })
             .catch(() => {});
+
+        // 检查该用户是否已订阅，更新订阅按钮状态
+        this.checkSubscriptionStatus();
+    },
+
+    async checkSubscriptionStatus() {
+        if (!this.user || !this.user.sec_uid) return;
+        const btn = document.getElementById('dy-user-subscribe-btn');
+        const textEl = document.getElementById('dy-user-subscribe-text');
+        if (!btn || !textEl) return;
+
+        try {
+            const data = await API.douyinSubscription.list();
+            const subs = data.subscriptions || [];
+            const found = subs.find(s => s.sec_uid === this.user.sec_uid);
+            if (found) {
+                textEl.textContent = '已订阅';
+                btn.disabled = false;
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-success');
+                btn.onclick = () => Router.navigate('dy_subscriptions');
+            } else {
+                textEl.textContent = '订阅该用户';
+                btn.disabled = false;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-secondary');
+                btn.onclick = () => DyUserPage.subscribeUser();
+            }
+        } catch (err) {
+            // 静默失败，保持默认状态
+        }
     },
 
     renderVideos() {
@@ -370,6 +408,43 @@ const DyUserPage = {
             this.toggleSelection(awemeId);
         } else {
             window.open(`https://www.douyin.com/video/${awemeId}`, '_blank');
+        }
+    },
+
+    async subscribeUser() {
+        if (!this.user || !this.user.sec_uid) {
+            Toast.show('用户信息未加载', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('dy-user-subscribe-btn');
+        const textEl = document.getElementById('dy-user-subscribe-text');
+        if (btn) { btn.disabled = true; }
+        if (textEl) { textEl.textContent = '订阅中...'; }
+
+        try {
+            const url = `https://www.douyin.com/user/${this.user.sec_uid}`;
+            const data = await API.douyinSubscription.add(url);
+            Toast.show(data.message, 'success');
+            // 订阅成功后更新按钮为"已订阅"状态，点击跳转到订阅管理页
+            if (textEl) { textEl.textContent = '已订阅'; }
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-success');
+                btn.onclick = () => Router.navigate('dy_subscriptions');
+            }
+        } catch (err) {
+            // 错误已由 API 层处理；恢复按钮状态
+            if (textEl) { textEl.textContent = '订阅该用户'; }
+            if (btn) { btn.disabled = false; }
+        }
+    },
+
+    openExternalHomepage() {
+        // 点击头像或昵称时打开抖音外部主页链接
+        if (this.user && this.user.sec_uid) {
+            window.open(`https://www.douyin.com/user/${this.user.sec_uid}`, '_blank');
         }
     },
 

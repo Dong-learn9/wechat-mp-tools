@@ -150,11 +150,28 @@ const DyLoginComponent = {
             this.statusText.style.color = "var(--text-primary)";
             this.loginHint.style.display = 'none';
 
+            // 检测是否在 Docker 环境（有 noVNC 远程桌面）
+            let novncUrl = '';
+            try {
+                const novncData = await API.novnc.url();
+                if (novncData && novncData.enabled) {
+                    novncUrl = novncData.novnc_url;
+                }
+            } catch (e) { /* 非 Docker 环境，忽略 */ }
+
             const res = await API.douyin.auth.start();
             Toast.show(res.message, 'success');
 
             // 显示取消按钮
             this.cancelBtn.style.display = 'inline-flex';
+
+            // Docker 环境下显示 noVNC 远程桌面 iframe
+            if (novncUrl) {
+                this.statusText.innerHTML = `
+                    <div class="scan-msg" style="margin-bottom: 12px;">${res.message || "请在浏览器窗口中扫码..."}</div>
+                    ${API.novnc.iframe(novncUrl)}
+                `;
+            }
 
             // 启动轮询
             if (this.statusTimer) clearInterval(this.statusTimer);
@@ -202,7 +219,14 @@ const DyLoginComponent = {
                 this.startBtn.disabled = true;
                 this.cancelBtn.style.display = 'inline-flex';
                 this.cancelBtn.disabled = false;
-                this.statusText.textContent = data.message || "请在浏览器窗口中扫码...";
+                // Docker 环境：保留 noVNC iframe，只更新文本消息
+                const novncIframe = this.statusText.querySelector('iframe');
+                if (novncIframe) {
+                    const msgEl = this.statusText.querySelector('.scan-msg');
+                    if (msgEl) msgEl.textContent = data.message || "请在浏览器窗口中扫码...";
+                } else {
+                    this.statusText.textContent = data.message || "请在浏览器窗口中扫码...";
+                }
                 this.statusText.style.color = "var(--primary)";
                 this.loginHint.style.display = 'block';
                 if (logoutBtn) logoutBtn.style.display = 'none';

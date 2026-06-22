@@ -1,0 +1,60 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+**/__pycache__/
+
+# Virtual environments
+venv*/
+.venv/
+
+# Build artifacts
+build/
+dist/
+ms-playwright/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE / editor
+.claude/
+.vscode/
+.idea/
+
+# Local data, credentials and logs (CRITICAL FOR SECURITY)
+data/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Heavy subtitle remover module (not used by web app, has ML deps)
+backend/subtitle_remover/
+
+# External reference projects
+we-mp-rss/
+wechat_video_sniffer_repo/
+wx_channels_download_temp/
+
+# PyInstaller spec (desktop packaging only)
+wechat_mp_tools.spec
+
+# Standalone legacy scripts (not imported by Flask app)
+wechat_mp_article_fetcher.py
+wechat_mp_batch_downloader.py
+wechat_mp_login.py
+
+# Docker files themselves (not needed inside image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs
+BUILD.md
+README.md
+LICENSE
+docs/

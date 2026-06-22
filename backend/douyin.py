@@ -63,6 +63,9 @@ _task_state = {
 _task_lock = threading.Lock()
 _task_cancel_event = threading.Event()  # 取消标志
 
+# 历史记录文件读写锁（多线程下载时防止并发写入损坏文件）
+_history_lock = threading.Lock()
+
 
 def _add_log(message: str):
     with _task_lock:
@@ -112,6 +115,8 @@ def clean_filename(filename: str) -> str:
     """清理文件名，移除不支持的字符"""
     filename = re.sub(r'[\\/:*?"<>|\n\r\t]', "", filename)
     filename = filename.strip().replace(" ", "_")
+    # 移除首尾点号，避免 Windows 下以点开头/结尾的文件夹无法删除
+    filename = filename.strip(".")
     return filename[:80] if filename else "untitled"
 
 
@@ -129,16 +134,17 @@ def generate_verify_fp() -> str:
 
 
 def add_history_item(title: str, item_type: str, file_path: str, size_bytes: int):
-    """保存下载记录到历史记录文件"""
-    history = load_json(HISTORY_FILE, [])
-    history.insert(0, {
-        "title": title,
-        "type": item_type,
-        "path": str(file_path),
-        "size": f"{size_bytes / (1024 * 1024):.2f} MB" if size_bytes else "未知",
-        "time": time.strftime("%Y-%m-%d %H:%M:%S")
-    })
-    save_json(HISTORY_FILE, history[:150])
+    """保存下载记录到历史记录文件（线程安全）"""
+    with _history_lock:
+        history = load_json(HISTORY_FILE, [])
+        history.insert(0, {
+            "title": title,
+            "type": item_type,
+            "path": str(file_path),
+            "size": f"{size_bytes / (1024 * 1024):.2f} MB" if size_bytes else "未知",
+            "time": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+        save_json(HISTORY_FILE, history[:150])
 
 
 # ── 抖音 API 客户端 ──────────────────────────────────────
@@ -494,11 +500,12 @@ class DouyinClient:
     def parse_media_info(detail: dict) -> dict:
         """
         从 aweme_detail 中提取下载所需的资源信息
-        返回: {type, title, urls, aweme_id, nickname}
+        返回: {type, title, urls, aweme_id, nickname, create_time}
         """
         aweme_id = detail.get("aweme_id", "unknown")
         desc = detail.get("desc", "")
         title = clean_filename(desc) if desc else f"抖音作品_{aweme_id}"
+        create_time = detail.get("create_time", 0)
 
         author_nickname = ""
         if "author" in detail and isinstance(detail["author"], dict):
@@ -523,6 +530,7 @@ class DouyinClient:
                 "urls": urls,
                 "aweme_id": aweme_id,
                 "nickname": nickname,
+                "create_time": create_time,
             }
         else:
             # 视频类型 — 从多个地址源中选择最佳无水印版本
@@ -591,6 +599,7 @@ class DouyinClient:
                 "urls": [chosen_url] if chosen_url else [],
                 "aweme_id": aweme_id,
                 "nickname": nickname,
+                "create_time": create_time,
             }
 
 
@@ -630,24 +639,36 @@ def download_media(media_info: dict, target_dir: Path) -> dict:
     item_type = media_info["type"]
     urls = media_info["urls"]
     nickname = media_info.get("nickname", "未知用户")
+    create_time = media_info.get("create_time", 0)
 
     if not urls:
         raise Exception("无法获取资源下载链接")
 
-    title_with_id = f"{aweme_id}_{title}"
+    # 文件命名规则：作者-发布日期-作品类型(视频或者图集)-标题
+    from datetime import datetime
+    try:
+        publish_date = datetime.fromtimestamp(int(create_time)).strftime("%Y-%m-%d") if create_time else "未知日期"
+    except (ValueError, OSError, OverflowError):
+        publish_date = "未知日期"
+    type_label = "视频" if item_type == "video" else "图集"
+    file_name = clean_filename(f"{nickname}-{publish_date}-{type_label}-{title}")
+
     total_bytes = 0
 
     user_dir = target_dir / nickname
     user_dir.mkdir(parents=True, exist_ok=True)
 
     if item_type == "video":
-        save_file = user_dir / f"{title_with_id}.mp4"
+        save_file = user_dir / f"{file_name}.mp4"
         _add_log(f"🎬 正在下载无水印视频: {save_file.name}")
         total_bytes = download_file(urls[0], save_file)
         _add_log(f"✅ 视频下载完成! 大小: {total_bytes / (1024 * 1024):.2f} MB")
-        add_history_item(title, "视频", save_file, total_bytes)
+        try:
+            add_history_item(title, "视频", save_file, total_bytes)
+        except Exception as e:
+            _add_log(f"⚠️ 历史记录保存失败（不影响下载）: {e}")
     else:
-        folder_path = user_dir / title_with_id
+        folder_path = user_dir / file_name
         folder_path.mkdir(parents=True, exist_ok=True)
         _add_log(f"📸 正在下载图集 (共 {len(urls)} 张) 到目录: {folder_path.name}")
         for idx, img_url in enumerate(urls, 1):
@@ -655,7 +676,10 @@ def download_media(media_info: dict, target_dir: Path) -> dict:
             img_bytes = download_file(img_url, save_file)
             total_bytes += img_bytes
         _add_log(f"✅ 图集全部下载完成! 总大小: {total_bytes / (1024 * 1024):.2f} MB")
-        add_history_item(title, "图文", folder_path, total_bytes)
+        try:
+            add_history_item(title, "图文", folder_path, total_bytes)
+        except Exception as e:
+            _add_log(f"⚠️ 历史记录保存失败（不影响下载）: {e}")
 
     return {
         "id": aweme_id,

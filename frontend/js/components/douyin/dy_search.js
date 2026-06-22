@@ -89,9 +89,9 @@ const DySearchPage = {
             
             card.innerHTML = `
                 <div style="display: flex; gap: 16px; align-items: center;">
-                    <img src="${avatar}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--bg-input);">
+                    <img src="${avatar}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--bg-input); cursor: pointer;" onclick="event.stopPropagation(); window.open('https://www.douyin.com/user/${sec_uid}', '_blank')">
                     <div style="flex: 1; overflow: hidden;">
-                        <h3 style="font-size: 1.1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${nickname}</h3>
+                        <h3 style="font-size: 1.1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;" onclick="event.stopPropagation(); window.location.hash = '#dy_user?sec_uid=${sec_uid}'">${nickname}</h3>
                         <p style="font-size: 0.85rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${signature}</p>
                     </div>
                 </div>

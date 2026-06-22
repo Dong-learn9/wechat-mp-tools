@@ -149,6 +149,24 @@ def _do_login():
             _set_state("scanning", "正在打开快手登录页面，请扫码登录...")
             page.goto("https://www.kuaishou.com/", timeout=60000)
 
+            # 尝试点击登录按钮（可选，用户也可以手动点击）
+            try:
+                page.wait_for_timeout(2000)
+                login_selectors = [
+                    'text="登录"',
+                    'text="Log in"',
+                    'div:has-text("登录")',
+                    '[class*="login"]',
+                ]
+                for selector in login_selectors:
+                    try:
+                        page.click(selector, timeout=3000)
+                        break
+                    except Exception:
+                        continue
+            except Exception:
+                pass  # 忽略点击失败，用户可以手动点击
+
             _set_state("scanning", "请在浏览器窗口中完成扫码登录")
 
             login_success = False

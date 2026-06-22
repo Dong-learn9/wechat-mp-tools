@@ -1,0 +1,35 @@
+# docker-compose.yml — WeChat MP Tools
+# 用法:
+#   docker compose up -d --build     构建并后台启动
+#   docker compose logs -f           查看日志
+#   docker compose down              停止并移除容器
+# 访问: http://localhost:5200
+
+services:
+  wechat-mp-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wechat-mp-tools:latest
+    container_name: wechat-mp-tools
+    restart: unless-stopped
+    ports:
+      - "5200:5200"
+      - "6080:6080"  # noVNC Web 桌面（扫码登录用）
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5200
+      - NO_BROWSER=1
+      - PYTHONUNBUFFERED=1
+      - NOVNC_PORT=6080
+    volumes:
+      # 数据持久化：Cookie / 历史 / 下载内容
+      - ./data:/app/data
+    # Playwright 需要共享内存以避免 Chromium 崩溃
+    shm_size: "1gb"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5200/api/settings"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
